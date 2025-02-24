@@ -6,11 +6,13 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Brand, Category, Product, Address
+from .models import Brand, Category, Product, Address, Comment, Order
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, AddressSerializer, BrandSerializer, \
-    CategorySerializer, ProductSerializer
+from .serializers import (RegisterSerializer, LoginSerializer, UserSerializer,AddressSerializer,
+                          BrandSerializer, CommentSerializer,CategorySerializer, ProductSerializer, OrderSerializer)
 from django.contrib.auth import get_user_model
+from django.http import Http404
+
 
 User = get_user_model()
 
@@ -75,8 +77,7 @@ class RegisterAPIView(APIView):
                 return Response(
                     {
                         'refresh': str(refresh),
-                        'access': str(refresh.access_token),
-                        'user': RegisterSerializer(user).data
+                        'access': str(refresh.access_token)
                     }, status=status.HTTP_201_CREATED
                 )
             except Exception as e:
@@ -108,16 +109,22 @@ class UserUpdateView(APIView):
             return Response({"message": "User updated successfully"}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+
+
+
 class AddressListCreateAPIView(APIView):
-    """
-    GET - Address ro'yxatini olish
-    POST - Yangi Address qo'shish
-    """
 
     def get(self, request):
         addresses = Address.objects.all()
         serializer = AddressSerializer(addresses, many=True)
         return Response(serializer.data)
+
+    @extend_schema(
+        summary='Address',
+        description='Enter address',
+        request=AddressSerializer
+    )
 
     def post(self, request):
         serializer = AddressSerializer(data=request.data)
@@ -125,6 +132,10 @@ class AddressListCreateAPIView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
 
 class AddressDetailAPIView(APIView):
 
@@ -135,22 +146,22 @@ class AddressDetailAPIView(APIView):
             return None
 
 
-    def get(self, request, pk):
-        address = self.get_object(pk)
-        if address is None:
-            return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
-        serializer = AddressSerializer(address)
-        return Response(serializer.data)
-
-    def put(self, request, pk):
-        address = self.get_object(pk)
-        if address is None:
-            return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
-        serializer = AddressSerializer(address, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # def get(self, request, pk):
+    #     address = self.get_object(pk)
+    #     if address is None:
+    #         return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
+    #     serializer = AddressSerializer(address)
+    #     return Response(serializer.data)
+    #
+    # def put(self, request, pk):
+    #     address = self.get_object(pk)
+    #     if address is None:
+    #         return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
+    #     serializer = AddressSerializer(address, data=request.data)
+    #     if serializer.is_valid():
+    #         serializer.save()
+    #         return Response(serializer.data)
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
         address = self.get_object(pk)
@@ -159,17 +170,27 @@ class AddressDetailAPIView(APIView):
         address.delete()
         return Response({"message": "Address deleted"}, status=status.HTTP_204_NO_CONTENT)
 
+
+
+
 class BrandAPI(APIView):
     def get(self, request):
         brands = Brand.objects.all()
         serializer = BrandSerializer(brands, many=True)
         return Response(serializer.data)
 
+
+
+
 class CategoryAPI(APIView):
     def get(self, request):
         categories = Category.objects.all()
         serializer = CategorySerializer(categories)
         return Response(serializer.data)
+
+
+
+
 
 class ProductAPI(APIView):
     parser_classes = (MultiPartParser, FormParser)
@@ -189,3 +210,123 @@ class ProductAPI(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+class CommentListAPIView(APIView):
+
+    def get(self, request):
+        comments = Comment.objects.all()
+        serializer = CommentSerializer(comments, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary='Comment',
+        description='Enter Comment',
+        request=CommentSerializer
+    )
+
+    def post(self, request):
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class CommentDetailView(APIView):
+
+    def get_object(self, pk):
+        try:
+            return Comment.objects.get(pk=pk)
+        except Comment.DoesNotExist:
+            return None
+
+    # def get(self, request, pk):
+    #     comment = get_object_or_404(Comment, pk=pk)
+    #     serializer = CommentSerializer(comment)
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
+    #
+    # def put(self, request, pk):
+    #     comment = get_object_or_404(Comment, pk=pk)
+    #     serializer = CommentSerializer(comment, data=request.data)
+    #     if serializer.is_valid():
+    #         serializer.save()
+    #         return Response(serializer.data, status=status.HTTP_200_OK)
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        comment = self.get_object(pk)
+        if comment is None:
+            return Response({"error": "Comment not found"}, status=status.HTTP_404_NOT_FOUND)
+        comment.delete()
+        return Response({"message": "Comment deleted"}, status=status.HTTP_204_NO_CONTENT)
+
+
+
+
+
+
+
+class OrderListView(APIView):
+
+    def get(self, request):
+        orders = Order.objects.all()
+        serializer = OrderSerializer(orders, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary='Order',
+        description='Enter Orders',
+        request=OrderSerializer
+    )
+
+    def post(self, request):
+        serializer = OrderSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+class OrderDetailView(APIView):
+
+    def get_object(self, pk):
+        try:
+            return Order.objects.get(pk=pk)
+        except Order.DoesNotExist:
+            raise Http404
+
+    def get(self, request, pk):
+        order = self.get_object(pk)
+        serializer = OrderSerializer(order)
+        return Response(serializer.data)
+
+    # def put(self, request, pk):
+    #     order = self.get_object(pk)
+    #     serializer = OrderSerializer(order, data=request.data)
+    #     if serializer.is_valid():
+    #         serializer.save()
+    #         return Response(serializer.data)
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        order = self.get_object(pk)
+        order.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+
+
+
+
+
+
+
+
+

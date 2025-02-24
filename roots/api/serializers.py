@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Address, Brand, Category, Product
+from .models import User, Address, Brand, Category, Product, Comment, Order
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -22,9 +22,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**validated_data)
         return user
 
+
+
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+
+
 
 class UserSerializer(serializers.ModelSerializer):
 
@@ -32,22 +36,46 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ('first_name', 'last_name', 'username', 'email', 'password')
 
+
+
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
         fields = '__all__'  # Barcha maydonlarni qo'shamiz
+
+
+
 
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
         fields = ('id', 'name')
 
+
+
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ('id', 'name')
 
+
+
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = ('id', 'name', 'description', 'price', 'stock')
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ('user', 'message', 'status', 'created_at')
+
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Order
+        fields = "__all__"
+
+
