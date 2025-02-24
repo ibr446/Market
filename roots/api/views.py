@@ -295,17 +295,6 @@ class OrderListView(APIView):
 
 class OrderDetailView(APIView):
 
-    def get_object(self, pk):
-        try:
-            return Order.objects.get(pk=pk)
-        except Order.DoesNotExist:
-            raise Http404
-
-    def get(self, request, pk):
-        order = self.get_object(pk)
-        serializer = OrderSerializer(order)
-        return Response(serializer.data)
-
     # def put(self, request, pk):
     #     order = self.get_object(pk)
     #     serializer = OrderSerializer(order, data=request.data)
@@ -318,6 +307,8 @@ class OrderDetailView(APIView):
         order = self.get_object(pk)
         order.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 
 
 
