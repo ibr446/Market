@@ -6,10 +6,10 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Brand, Category, Product, Address, Comment, Order
+from .models import Brand, Category, Product, Address, Comment, Order, Deal
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import (RegisterSerializer, LoginSerializer, UserSerializer,AddressSerializer,
-                          BrandSerializer, CommentSerializer,CategorySerializer, ProductSerializer, OrderSerializer)
+                          BrandSerializer, CommentSerializer,CategorySerializer, ProductSerializer, OrderSerializer, DealSerializer)
 from django.contrib.auth import get_user_model
 from django.http import Http404
 
@@ -256,15 +256,12 @@ class CommentDetailView(APIView):
     #         serializer.save()
     #         return Response(serializer.data, status=status.HTTP_200_OK)
     #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
     def delete(self, request, pk):
         comment = self.get_object(pk)
         if comment is None:
             return Response({"error": "Comment not found"}, status=status.HTTP_404_NOT_FOUND)
         comment.delete()
         return Response({"message": "Comment deleted"}, status=status.HTTP_204_NO_CONTENT)
-
-
 
 
 
@@ -307,6 +304,29 @@ class OrderDetailView(APIView):
         order = self.get_object(pk)
         order.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+class DealAPIView(APIView):
+
+    def get(self, request):
+        deal = Deal.objects.all()
+        serializer = DealSerializer(deal, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary='Deal',
+        description="Enter Deal",
+        request=DealSerializer
+    )
+
+
+    def post(self, request):
+        serializer = DealSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 

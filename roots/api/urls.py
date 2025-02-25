@@ -4,7 +4,7 @@ from .views import (RegisterAPIView, LoginAPIView,
                     UserUpdateView, BrandAPI, CategoryAPI,
                     ProductAPI, CommentListAPIView,
                     CommentDetailView, AddressDetailAPIView,
-                    AddressListCreateAPIView, OrderListView, OrderDetailView)
+                    AddressListCreateAPIView, OrderListView, OrderDetailView, DealAPIView)
 
 
 urlpatterns = [
@@ -20,7 +20,9 @@ urlpatterns = [
     path('addresses/<int:pk>/', AddressDetailAPIView.as_view(), name='address-detail'),
     path('orders', OrderListView.as_view(), name='order-list'),
     path('orders/<int:pk>/', OrderDetailView.as_view(), name='orders-detail'),
+    path('deal', DealAPIView.as_view(), name='deal-list')
 ]
+
 
 
 

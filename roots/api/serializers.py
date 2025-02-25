@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Address, Brand, Category, Product, Comment, Order
+from .models import User, Address, Brand, Category, Product, Comment, Order, Deal
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -24,6 +24,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 
+
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
@@ -41,7 +42,7 @@ class UserSerializer(serializers.ModelSerializer):
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
-        fields = '__all__'  # Barcha maydonlarni qo'shamiz
+        fields = '__all__'
 
 
 
@@ -69,14 +70,23 @@ class ProductSerializer(serializers.ModelSerializer):
 class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ('user', 'message', 'status')
+        fields = ('user', 'message', 'status', 'created_at')
 
 
 
 class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Order
-        fields = ('id', 'user', 'total_price', 'status')
+        fields = ('id', 'user', 'brand', 'total_price', 'status', 'created_at')
+
+
+
+class DealSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Deal
+        fields = ('id', 'start_time', 'end_time', 'img', 'discount', 'discount_time')
+
+
 
 
 
