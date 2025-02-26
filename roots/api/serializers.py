@@ -1,5 +1,7 @@
+from django.conf import settings
 from rest_framework import serializers
-from .models import User, Address, Brand, Category, Product, Comment, Order, Deal
+from .models import User, Address, Brand, Category, Product, ProductImage, Review, Supplier, Order, Wishlist, \
+    Comment, CartItem, Deal
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -23,11 +25,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
-
-
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
+
 
 
 
@@ -42,8 +43,7 @@ class UserSerializer(serializers.ModelSerializer):
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
-        fields = '__all__'
-
+        fields = '__all__'  # Barcha maydonlarni qo'shamiz
 
 
 
@@ -62,15 +62,43 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    # user = UserSerializer(write_only=True)
+
     class Meta:
         model = Product
-        fields = ('id', 'name', 'description', 'price', 'stock')
+        fields = ('id', 'user', 'name', 'description', 'price', 'stock')
+
+    # def create(self, validated_data):
+    #     user = self.context['request'].user  # Foydalanuvchini olamiz
+    #     return Product.objects.create(user=user, **validated_data)
 
 
-class CommentSerializer(serializers.ModelSerializer):
+
+class ProductImageSerializer(serializers.ModelSerializer):
+    product = ProductSerializer()
     class Meta:
-        model = Comment
-        fields = ('user', 'message', 'status', 'created_at')
+        model = ProductImage
+        fields = ('id', 'product', 'image_url')
+
+    def get_product(self, obj):
+        return obj.product.name
+
+
+
+
+class SupplierSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Supplier
+        fields = '__all__'
+
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Review
+        fields = ('id', 'user', 'product', 'rating', 'comment')
 
 
 
@@ -81,13 +109,43 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 
+
+
+class WishlistSerializer(serializers.ModelSerializer): # User nomi bilan keladi
+    created_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
+
+    class Meta:
+        model = Wishlist
+        fields = ['id', 'user','product', 'created_at']
+
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ('user', 'message', 'status', 'created_at')
+
+
+
+
+class CartItemSerializer(serializers.ModelSerializer):
+    img = serializers.ImageField()
+    class Meta:
+        model = CartItem
+        fields = '__all__'
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.img:
+            representation['img'] = settings.BASE_URL + instance.img.url
+        else:
+            representation['img'] = None
+        return representation
+
+
+
+
 class DealSerializer(serializers.ModelSerializer):
     class Meta:
         model = Deal
         fields = ('id', 'start_time', 'end_time', 'img', 'discount', 'discount_time')
-
-
-
-
-
-

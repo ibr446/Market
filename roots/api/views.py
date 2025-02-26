@@ -1,24 +1,24 @@
-from django.contrib.auth.hashers import make_password
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema, OpenApiResponse
-from rest_framework import status
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework import status, generics, permissions
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
-from .models import Brand, Category, Product, Address, Comment, Order, Deal
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import (RegisterSerializer, LoginSerializer, UserSerializer,AddressSerializer,
-                          BrandSerializer, CommentSerializer,CategorySerializer, ProductSerializer, OrderSerializer, DealSerializer)
+from .admin import Address, Brand, Category
+from .models import Review, Product, Supplier, Order, Wishlist, ProductImage, Comment, CartItem, Deal
+from .serializers import (RegisterSerializer, LoginSerializer, UserSerializer, AddressSerializer, BrandSerializer,
+    CategorySerializer, ProductSerializer, ProductImageSerializer, ReviewSerializer, SupplierSerializer,
+    OrderSerializer, WishlistSerializer, CommentSerializer, CartItemSerializer, DealSerializer)
 from django.contrib.auth import get_user_model
-from django.http import Http404
 
 
 User = get_user_model()
 
 
-
-class LoginAPIView(APIView):
+class LoginApiView(APIView):
     @extend_schema(
             summary='User Login',
             description='Login using email and password to obtain JWT tokens',
@@ -50,7 +50,7 @@ class LoginAPIView(APIView):
 
 
 
-class RegisterAPIView(APIView):
+class RegisterApiView(APIView):
     @extend_schema(
         summary='User Register',
         description='Register using email and password to obtain JWT tokens',
@@ -111,20 +111,13 @@ class UserUpdateView(APIView):
 
 
 
-
-
 class AddressListCreateAPIView(APIView):
+
 
     def get(self, request):
         addresses = Address.objects.all()
         serializer = AddressSerializer(addresses, many=True)
         return Response(serializer.data)
-
-    @extend_schema(
-        summary='Address',
-        description='Enter address',
-        request=AddressSerializer
-    )
 
     def post(self, request):
         serializer = AddressSerializer(data=request.data)
@@ -132,8 +125,6 @@ class AddressListCreateAPIView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 
 
 
@@ -145,23 +136,22 @@ class AddressDetailAPIView(APIView):
         except Address.DoesNotExist:
             return None
 
+    def get(self, request, pk):
+        address = self.get_object(pk)
+        if address is None:
+            return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = AddressSerializer(address)
+        return Response(serializer.data)
 
-    # def get(self, request, pk):
-    #     address = self.get_object(pk)
-    #     if address is None:
-    #         return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
-    #     serializer = AddressSerializer(address)
-    #     return Response(serializer.data)
-    #
-    # def put(self, request, pk):
-    #     address = self.get_object(pk)
-    #     if address is None:
-    #         return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
-    #     serializer = AddressSerializer(address, data=request.data)
-    #     if serializer.is_valid():
-    #         serializer.save()
-    #         return Response(serializer.data)
-    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def put(self, request, pk):
+        address = self.get_object(pk)
+        if address is None:
+            return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = AddressSerializer(address, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
         address = self.get_object(pk)
@@ -172,39 +162,36 @@ class AddressDetailAPIView(APIView):
 
 
 
-
 class BrandAPI(APIView):
     def get(self, request):
         brands = Brand.objects.all()
         serializer = BrandSerializer(brands, many=True)
         return Response(serializer.data)
 
-
-
-
 class CategoryAPI(APIView):
     def get(self, request):
         categories = Category.objects.all()
-        serializer = CategorySerializer(categories)
+        serializer = CategorySerializer(categories, many=True)
         return Response(serializer.data)
 
 
 
-
-
 class ProductAPI(APIView):
-    parser_classes = (MultiPartParser, FormParser)
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
-    @extend_schema(
-        request=ProductSerializer,
-        responses={200: "Product create successfully"}
-    )
     def get(self, request):
         products = Product.objects.all()
         serializer = ProductSerializer(products, many=True)
         return Response(serializer.data)
 
-    def post(self, request):
+    @extend_schema(
+        summary='Product',
+        description='Enter Product',
+        request=ProductSerializer
+    )
+
+    def post(self, request, *args, **kwargs):
+        print("Received data:", request.data)  # Debug uchun
         serializer = ProductSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -213,22 +200,88 @@ class ProductAPI(APIView):
 
 
 
+class ProductDeleteAPIView(APIView):
+    permission_classes = [IsAuthenticated]
 
-class CommentListAPIView(APIView):
+    @extend_schema(
+        request=ProductSerializer,
+        responses={200: "Product deleted successfully"}
+    )
+    def delete(self, request, pk):
+        try:
+            product = Product.objects.get(pk=pk)
+            # ❗ Faqat mahsulot egasi o‘chirishi mumkin
+            if product.user != request.user:
+                return Response({"error": "You do not have permission to delete this product"},
+                                status=status.HTTP_403_FORBIDDEN)
+            product.delete()
+            return Response({"message": "Product deleted"}, status=status.HTTP_204_NO_CONTENT)
+
+        except Product.DoesNotExist:
+            return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+class ProductUpdateAPIView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [IsAuthenticated]
+
+
+    @extend_schema(
+        summary="Product Update",
+        description="Product update data",
+        request=ProductSerializer,  # Specify request body fields
+        responses={
+            200: OpenApiParameter(name="Update", description="Product update data"),
+            400: OpenApiParameter(name="Errors", description="Invalid credentials or validation errors"),
+        },
+        tags=["Product Update"]
+    )
+    def put(self, request, pk):
+        product = get_object_or_404(Product, pk=pk)
+        serializer = ProductSerializer(product, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=HTTP_200_OK)
+        return Response(serializer.errors, status=400)
+
+
+class ProductDetailAPIView(APIView):
+    def get(self, request, pk):
+        product = get_object_or_404(Product, pk=pk)
+        serializer = ProductSerializer(product)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+
+class ProductImageAPIView(APIView):
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get(self, request):
-        comments = Comment.objects.all()
-        serializer = CommentSerializer(comments, many=True)
+        products = ProductImage.objects.all()
+        serializer = ProductImageSerializer(products, many=True)
+        return Response(serializer.data)
+
+
+
+
+class ReviewAPIView(APIView):
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+
+    def get(self, request):
+        reviews = Review.objects.all()
+        serializer = ReviewSerializer(reviews, many=True)
         return Response(serializer.data)
 
     @extend_schema(
-        summary='Comment',
-        description='Enter Comment',
-        request=CommentSerializer
+        summary='Review',
+        description='Enter Review',
+        request=ReviewSerializer,
     )
 
-    def post(self, request):
-        serializer = CommentSerializer(data=request.data)
+    def post(self, request, *args, **kwargs):
+        serializer = ReviewSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -236,34 +289,48 @@ class CommentListAPIView(APIView):
 
 
 
-class CommentDetailView(APIView):
+class SuplierCreateAPIView(APIView):
+    def get(self, request):
+        suppliers = Supplier.objects.all()
+        serializer = SupplierSerializer(suppliers, many=True)
+        return Response(serializer.data)
 
-    def get_object(self, pk):
+    @extend_schema(
+            summary='Supplier',
+            description='Enter supplier',
+            request=SupplierSerializer
+    )
+
+    def post(self, request):
+        serializer = SupplierSerializer(data = request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class SuplierDetailAPIView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request, pk):
         try:
-            return Comment.objects.get(pk=pk)
-        except Comment.DoesNotExist:
-            return None
+            supplier = Supplier.objects.get(user=request.user, pk=pk)
+        except Supplier.DoesNotExist:
+            return Response({'error': 'Supplier not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    # def get(self, request, pk):
-    #     comment = get_object_or_404(Comment, pk=pk)
-    #     serializer = CommentSerializer(comment)
-    #     return Response(serializer.data, status=status.HTTP_200_OK)
-    #
-    # def put(self, request, pk):
-    #     comment = get_object_or_404(Comment, pk=pk)
-    #     serializer = CommentSerializer(comment, data=request.data)
-    #     if serializer.is_valid():
-    #         serializer.save()
-    #         return Response(serializer.data, status=status.HTTP_200_OK)
-    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = SupplierSerializer(supplier)
+        return Response(serializer.data)
+
     def delete(self, request, pk):
-        comment = self.get_object(pk)
-        if comment is None:
-            return Response({"error": "Comment not found"}, status=status.HTTP_404_NOT_FOUND)
-        comment.delete()
-        return Response({"message": "Comment deleted"}, status=status.HTTP_204_NO_CONTENT)
-
-
+        try:
+            supplier = Supplier.objects.get(user=request.user, pk=pk)
+            if supplier.user != request.user:
+                return Response({"error": "You do not have permission to delete this supplier"},)
+            supplier.delete()
+            return Response({"message": "Supplier deleted"}, status=status.HTTP_204_NO_CONTENT)
+        except Supplier.DoesNotExist:
+            return Response({"error": "Supplier not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
 
@@ -292,17 +359,112 @@ class OrderListView(APIView):
 
 class OrderDetailView(APIView):
 
-    # def put(self, request, pk):
-    #     order = self.get_object(pk)
-    #     serializer = OrderSerializer(order, data=request.data)
-    #     if serializer.is_valid():
-    #         serializer.save()
-    #         return Response(serializer.data)
-    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
     def delete(self, request, pk):
         order = self.get_object(pk)
         order.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+
+
+class WishlistListCreateView(generics.ListCreateAPIView):
+    queryset = Wishlist.objects.all()
+    serializer_class = WishlistSerializer
+    permission_classes = [IsAuthenticated]
+
+
+
+
+
+class CommentListAPIView(APIView):
+
+    def get(self, request):
+        comments = Comment.objects.all()
+        serializer = CommentSerializer(comments, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary='Comment',
+        description='Enter Comment',
+        request=CommentSerializer
+    )
+    def post(self, request):
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class CommentDetailView(APIView):
+
+    def get_object(self, pk):
+        try:
+            return Comment.objects.get(pk=pk)
+        except Comment.DoesNotExist:
+            return None
+
+    def delete(self, request, pk):
+        comment = self.get_object(pk)
+        if comment is None:
+            return Response({"error": "Comment not found"}, status=status.HTTP_404_NOT_FOUND)
+        comment.delete()
+        return Response({"message": "Comment deleted"}, status=status.HTTP_204_NO_CONTENT)
+
+
+
+
+
+class CartItemListCreateAPIView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get(self, request):
+        cart_items = CartItem.objects.all()
+        serializer = CartItemSerializer(cart_items, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary='CartItem',
+        description='Enter CartItem',
+        request=CartItemSerializer
+    )
+    def post(self, request):
+        serializer = CartItemSerializer(data=request.data)
+        try:
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except CartItem.DoesNotExist:
+            return Response({"error": "Cart item not found"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ❗ Agar serializer noto‘g‘ri bo‘lsa, shuni qaytarish kerak
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CartItemDetailAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, pk, user):
+        return get_object_or_404(CartItem, pk=pk, user=user)
+
+    def get(self, request, pk):
+        cart_item = self.get_object(pk, request.user)
+        serializer = CartItemSerializer(cart_item)
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        cart_item = self.get_object(pk, request.user)
+        serializer = CartItemSerializer(cart_item, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        cart_item = self.get_object(pk, request.user)
+        cart_item.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -327,17 +489,3 @@ class DealAPIView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
